@@ -1,0 +1,2 @@
+read_verilog -sv modules/Cpu.sv
+write_cxxrtl output/Cpu.hpp

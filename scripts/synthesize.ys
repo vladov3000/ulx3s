@@ -1,0 +1,2 @@
+read_verilog -sv modules/*.sv
+synth_ecp5 -json output/Top.json

@@ -1,2 +1,0 @@
-read_verilog -sv Top.sv
-synth_ecp5 -json Top.json
