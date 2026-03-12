@@ -45,9 +45,9 @@ int main(int argc, char** argv) {
     for (I64 cycle = 0; cycle < 1000; cycle++) {
         cpu.p_reset.set(cycle == 0);
 
-        U32  read_address = cpu.p_read__address.get<U32>() % memory.size;
-        U32  read_data    = *(U32*) &memory.data[read_address];
-        cpu.p_read__data  = value<32>(read_data);
+        U32 read_address = cpu.p_read__address.get<U32>() % memory.size;
+        U32 read_data    = *(U32*) &memory.data[read_address];
+        cpu.p_read__data = value<32>(read_data);
 
         U32 write_address = cpu.p_write__address.get<U32>() % memory.size;
         U32 write_data    = cpu.p_write__data.get<U32>();

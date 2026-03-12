@@ -93,24 +93,65 @@ static const Schema* find_schema(Bytes operation) {
 typedef struct {
     Bytes name;
     I64   offset;
-} Symbol;
+} Label;
 
 typedef struct {
-    Symbol* data;
-    I64     size;
-} Symbols;
+    Label* data;
+    I64    size;
+} Labels;
 
-static Symbol* find_symbol(Symbols* symbols, Bytes name) {
-    for (I64 i = 0; i < symbols->size; i++) {
-        Symbol* symbol = &symbols->data[i];
-        if (bytes_equal(symbol->name, name)) {
-            return symbol;
+static Label* find_label(Labels* labels, Bytes name) {
+    for (I64 i = 0; i < labels->size; i++) {
+        Label* label = &labels->data[i];
+        if (bytes_equal(label->name, name)) {
+            return label;
         }
     }
     return NULL;
 }
 
-static I64 next_instruction(Lexer* lexer) {
+typedef struct {
+    Labels labels;
+    Lexer  lexer;
+    I64    pc;
+} Assembler;
+
+static I64 parse_label(Assembler* assembler) {
+    Labels* labels = &assembler->labels;
+    I64     output = 0;
+
+    if (labels != NULL) {
+        Lexer* lexer  = &assembler->lexer;
+        Bytes  lexeme = lexer->lexeme_bytes;
+        Label* label  = find_label(labels, lexeme);
+        if (label == NULL) {
+            lexer_error(lexer, "Label \"%s\" is not defined.\n", lexeme);
+        }
+        output = assembler->pc - label->offset;
+    }
+
+    return output;
+}
+
+static I64 parse_offset(Assembler* assembler, I64 minimum, I64 maximum) {
+    Lexer*            lexer  = &assembler->lexer;
+    I64               output = 0;
+    ParseNumberResult result = try_parse_number(lexer, minimum, maximum, &output);
+    if (result != PARSE_NUMBER_OK) {
+        output = parse_label(assembler);
+        if (output < minimum) {
+            lexer_error(lexer, "Offset is too small. Minimum value must be 0x%x.\n", minimum);
+        }
+        if (output > maximum) {
+            lexer_error(lexer, "Offset too large. Maximum value must be 0x%x.\n", maximum);
+        }
+    }
+    return output;
+}
+
+static I64 next_instruction(Assembler* assembler) {
+    Lexer* lexer = &assembler->lexer;
+
     const Schema* schema = find_schema(lexer->lexeme_bytes);
     if (schema == NULL) {
         lexer_error(lexer, "Invalid operation \"%s\".\n", lexer->lexeme_bytes);
@@ -155,25 +196,25 @@ static I64 next_instruction(Lexer* lexer) {
     case OPCODE_IMM:
     case OPCODE_JALR:
     case OPCODE_LOAD:
-        parsed    = parse_immediate(lexer, 0, 0x7FF);
+        parsed    = parse_number(lexer, 0, 0x7FF);
         immediate = parsed << 20;
         break;
 
     case OPCODE_LUI:
     case OPCODE_AUIPC:
-        immediate = parse_immediate(lexer, 0, 0xFFFFF000);
+        immediate = parse_number(lexer, 0, 0xFFFFF000);
         if (immediate & 0xFFF) {
             lexer_error(lexer, "Offset must be a multiple of 0x1000.\n");
         }
         break;
 
     case OPCODE_OP:
-        rs2 = parse_register(lexer->lexeme_bytes);
+        rs2 = parse_register(lexer);
         break;
 
     case OPCODE_JAL:
-        parsed = parse_immediate(lexer, 0, 0xFFFFF);
-        if (parsed & 1) {
+        parsed = parse_offset(assembler, 0, 0xFFFFF);
+        if (parsed % 2 != 0) {
             lexer_error(lexer, "jal offset must be a multiple of 2.\n");
         }
         immediate |= slice_bits(parsed, 12, 19) << 12;
@@ -183,9 +224,9 @@ static I64 next_instruction(Lexer* lexer) {
         break;
 
     case OPCODE_BRANCH:
-        rs2 = parse_register(lexer->lexeme_bytes);
+        rs2   = parse_register(lexer);
         lex_operand(lexer);
-        parsed = parse_immediate(lexer, 0, 0xFFF);
+        parsed = parse_number(lexer, 0, 0xFFF);
         if (parsed & 1) {
             lexer_error(lexer, "Branch offset must be a multiple of 2.\n");
         }
@@ -196,9 +237,9 @@ static I64 next_instruction(Lexer* lexer) {
         break;
 
     case OPCODE_STORE:
-        rs2        = parse_register(lexer->lexeme_bytes);
+        rs2        = parse_register(lexer);
         lex_operand(lexer);
-        parsed     = parse_immediate(lexer, 0, 0xFFF);
+        parsed     = parse_number(lexer, 0, 0xFFF);
         immediate |= slice_bits(parsed, 0, 4) << 7;
         immediate |= slice_bits(parsed, 5, 11) << 25;
         break;
@@ -215,5 +256,29 @@ static I64 next_instruction(Lexer* lexer) {
     instruction    |= rs1    << 15;
     instruction    |= rs2    << 20;
     instruction    |= immediate;
+
+    assembler->pc += 4;
     return instruction;
+}
+
+static void compute_label_offsets(Assembler* assembler) {
+    Lexer*  lexer        = &assembler->lexer;
+    Buffer* console      = lexer->console;
+    Arena   labels_arena = make_arena(console, getpagesize());
+
+    while (lex(lexer)) {
+        Bytes lexeme = lexer->lexeme_bytes;
+        if (ends_with(lexeme, ":")) {
+            Label* label  = push(&labels_arena, Label);
+            label->name   = take(lexeme, -1);
+            label->offset = assembler->pc;
+        } else {
+            next_instruction(assembler);
+        }
+    }
+
+    assembler->labels = (Labels) {
+        .data = (Label*) labels_arena.memory,
+        .size = labels_arena.used / sizeof(Label),
+    };
 }

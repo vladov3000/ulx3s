@@ -91,14 +91,16 @@ static void lex_operand(Lexer* lexer) {
     }
 }
 
-static I64 parse_register(Bytes input) {
-    if (input.size < 2 || input.data[0] != 'x') {
+static I64 try_parse_register(Lexer* lexer) {
+    Bytes bytes = lexer->lexeme_bytes;
+
+    if (bytes.size < 2 || bytes.data[0] != 'x') {
         return -1;
     }
 
     I64 value = 0;
-    for (I64 i = 1; i < input.size; i++) {
-        U8 c = input.data[i];
+    for (I64 i = 1; i < bytes.size; i++) {
+        U8 c = bytes.data[i];
         if (!is_digit(c)) {
             return -1;
         }
@@ -113,16 +115,27 @@ static I64 parse_register(Bytes input) {
     return value;
 }
 
-static I64 lex_register(Lexer* lexer) {
-    lex_operand(lexer);
-    I64 register_ = parse_register(lexer->lexeme_bytes);
+static I64 parse_register(Lexer* lexer) {
+    I64 register_ = try_parse_register(lexer);
     if (register_ == -1) {
         lexer_error(lexer, "Invalid register \"%s\".\n", lexer->lexeme_bytes);
     }
     return register_;
 }
 
-static I64 parse_immediate(Lexer* lexer, I64 minimum, I64 maximum) {
+static I64 lex_register(Lexer* lexer) {
+    lex_operand(lexer);
+    return parse_register(lexer);
+}
+
+typedef enum {
+    PARSE_NUMBER_OK,
+    PARSE_NUMBER_NOT_INTEGER,
+    PARSE_NUMBER_TOO_SMALL,
+    PARSE_NUMBER_TOO_LARGE,
+} ParseNumberResult;
+
+static ParseNumberResult try_parse_number(Lexer* lexer, I64 minimum, I64 maximum, I64* output) {
     Bytes   bytes    = lexer->lexeme_bytes;
     bool    negative = false;
 
@@ -138,15 +151,14 @@ static I64 parse_immediate(Lexer* lexer, I64 minimum, I64 maximum) {
     }
 
     if (bytes.size == 0 || !get_digit(bytes.data[0], base, NULL)) {
-        lexer_error(lexer, "\"%s\" is not an integer.\n", lexer->lexeme_bytes);
+        return PARSE_NUMBER_NOT_INTEGER;
     }
 
     I64 value = 0;
-
     while (bytes.size > 0) {
         I64 digit = 0;
         if (!get_digit(bytes.data[0], base, &digit)) {
-            lexer_error(lexer, "\"%s\" is not an integer.\n", lexer->lexeme_bytes);
+            return PARSE_NUMBER_NOT_INTEGER;
         }
     
         if (negative) {
@@ -154,16 +166,37 @@ static I64 parse_immediate(Lexer* lexer, I64 minimum, I64 maximum) {
         }
     
         if (value < (minimum - digit) / base) {
-            lexer_error(lexer, "Immediate is too small. Minimum value must be 0x%x.\n", minimum);
+            return PARSE_NUMBER_TOO_SMALL;
         }
 
         if (value > (maximum - digit) / base) {
-            lexer_error(lexer, "Immediate too large. Maximum value must be 0x%x.\n", maximum);
+            return PARSE_NUMBER_TOO_LARGE;
         }
 
         value = base * value + digit;
         bytes = drop(bytes, 1);
     }
 
-    return value;
+    *output = value;
+    return PARSE_NUMBER_OK;
+}
+
+static I64 parse_number(Lexer* lexer, I64 minimum, I64 maximum) {
+    I64               output = 0;
+    ParseNumberResult result = try_parse_number(lexer, minimum, maximum, &output);
+    switch (result) {
+
+    case PARSE_NUMBER_NOT_INTEGER:
+        lexer_error(lexer, "\"%s\" is not an integer.\n", lexer->lexeme_bytes);
+
+    case PARSE_NUMBER_TOO_SMALL:
+        lexer_error(lexer, "Immediate is too small. Minimum value must be 0x%x.\n", minimum);
+
+    case PARSE_NUMBER_TOO_LARGE:
+        lexer_error(lexer, "Immediate too large. Maximum value must be 0x%x.\n", maximum);
+
+    default:
+        return output;
+
+    }
 }

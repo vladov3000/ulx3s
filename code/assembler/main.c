@@ -65,27 +65,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    Bytes path          = make_bytes(input_path);
-    Lexer lexer         = make_lexer(&console, path, input);
-    Arena symbols_arena = make_arena(&console, getpagesize());
-    I64   pc            = 0;
+    Bytes     path      = make_bytes(input_path);
+    Assembler assembler = {};
 
-    while (lex(&lexer)) {
-        if (ends_with(lexer.lexeme_bytes, ":")) {
-            Symbol* symbol = push(&symbols_arena, Symbol);
-            symbol->name   = take(lexer.lexeme_bytes, -1);
-            symbol->offset = pc;
-        } else {
-            next_instruction(&lexer);
-            pc += 4;
-        }
-    }
+    Lexer* lexer = &assembler.lexer;
+    *lexer       = make_lexer(&console, path, input);
+    compute_label_offsets(&assembler);
 
-    Symbols symbols = (Symbols) {
-        (Symbol*) symbols_arena.memory,
-        symbols_arena.used / sizeof(Symbol)
-    };
-    Buffer  output  = make_buffer(output_fd, getpagesize());
+    Buffer output = make_buffer(output_fd, getpagesize());
 
     if (output_format == FORMAT_ARRAY) {
         if (!write_bytes(&output, make_bytes("static const U32 instructions[] = {\n"))) {
@@ -93,13 +80,15 @@ int main(int argc, char** argv) {
         }
     }
 
-    lexer = make_lexer(&console, path, input);
-    while (lex(&lexer)) {
-        if (ends_with(lexer.lexeme_bytes, ":")) {
+    *lexer       = make_lexer(&console, path, input);
+    assembler.pc = 0;
+
+    while (lex(lexer)) {
+        if (ends_with(lexer->lexeme_bytes, ":")) {
             continue;
         }
 
-        I64 instruction = next_instruction(&lexer);
+        I64 instruction = next_instruction(&assembler);
 
         // 20 bytes necessary for i64_to_string. Extra 2 bytes for comma and newline.
         U8    storage[22] = {};
