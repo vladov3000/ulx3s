@@ -74,14 +74,14 @@ int main(int argc, char** argv) {
 
     Buffer output = make_buffer(output_fd, getpagesize());
 
+    *lexer       = make_lexer(&console, path, input);
+    assembler.pc = 0;
+
     if (output_format == FORMAT_ARRAY) {
         if (!write_bytes(&output, make_bytes("static const U32 instructions[] = {\n"))) {
             handle_write_failure(&console, output_path);
         }
     }
-
-    *lexer       = make_lexer(&console, path, input);
-    assembler.pc = 0;
 
     while (lex(lexer)) {
         if (ends_with(lexer->lexeme_bytes, ":")) {

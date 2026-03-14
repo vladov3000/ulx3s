@@ -4,6 +4,7 @@
 
 #include "../base/prelude.h"
 #include "../base/buffer.h"
+#include "../base/arena.h"
 #include "../base/extra.h"
 #include "../../output/Cpu.hpp"
 
@@ -27,8 +28,29 @@ int main(int argc, char** argv) {
         flush_and_exit(&console, EXIT_FAILURE);
     }
 
-    char* firmware_path = argv[1];
-    Bytes memory        = read_file(&console, firmware_path);
+    char* firmware_path       = argv[1];
+    Bytes firmware_path_bytes = make_bytes(firmware_path);
+
+    I32 input_fd = open(firmware_path, O_RDONLY);
+    if (input_fd == -1) {
+        print(&console, ERROR "Failed to open \"%s\": %s.\n", firmware_path_bytes, get_error());
+        flush_and_exit(&console, EXIT_FAILURE);
+    }
+
+    struct stat input_info = {};
+    if (fstat(input_fd, &input_info) == -1) {
+        print(&console, ERROR "Failed to stat \"%s\": %s.\n", firmware_path_bytes, get_error());
+        flush_and_exit(&console, EXIT_FAILURE);
+    }
+
+    Bytes memory = {};
+    memory.size  = max(1l << 32 /* 2 GiB */, input_info.st_size);
+    memory.data  = os_allocate(&console, memory.size);
+
+    if (read_all(input_fd, memory.data, input_info.st_size) == -1) {
+        print(&console, ERROR "Failed to read \"%s\": %s.\n", firmware_path_bytes, get_error());
+        flush_and_exit(&console, EXIT_FAILURE);
+    }
 
     p_Cpu cpu;
 

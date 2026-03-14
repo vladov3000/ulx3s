@@ -17,6 +17,8 @@
 
 #define length(array) sizeof(array) / sizeof((array)[0])
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
 typedef uint8_t  U8;
 typedef uint32_t U32;
 typedef int32_t  I32;

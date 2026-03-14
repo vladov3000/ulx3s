@@ -1,3 +1,16 @@
+static I64 read_all(I32 fd, U8* buffer, I64 size) {
+    I64 to_read = size;
+    while (to_read > 0) {
+        I64 bytes_read = read(fd, buffer, to_read);
+        if (bytes_read == -1) {
+            return -1;
+        }
+        buffer  += bytes_read;
+        to_read -= bytes_read;
+    }
+    return size;
+}
+
 static Bytes read_file(Buffer* console, const char* path) {
     Bytes path_bytes = make_bytes(path);
 

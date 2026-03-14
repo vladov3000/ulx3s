@@ -5,16 +5,18 @@ typedef struct {
     I64 size;
 } Buffer;
 
+static U8* try_os_allocate(I64 size) {
+    I32 protection = PROT_READ   | PROT_WRITE;
+    I32 flags      = MAP_PRIVATE | MAP_ANON;
+    U8* memory     = (U8*) mmap(NULL, size, protection, flags, -1, 0);
+    return memory;
+}
+
 static Buffer make_buffer(I32 fd, I64 size) {
     Buffer buffer = {};
 
-    I32 protection = PROT_READ   | PROT_WRITE;
-    I32 flags      = MAP_PRIVATE | MAP_ANON;
-    U8* memory     =  mmap(NULL, size, protection, flags, -1, 0);
-
+    U8* memory = try_os_allocate(size);
     if (memory == MAP_FAILED) {
-        // We implementing printing in terms of `Buffer`, so we have
-        // to directly write to standard output here.
         Iovec messages[] = {
             make_iovec(ERROR "Failed to allocate memory: "),
             make_iovec(strerror(errno)),

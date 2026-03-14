@@ -7,15 +7,17 @@ struct Arena {
     I64     used;
 };
 
-static Arena make_arena(Buffer* console, I64 size) {
-    I32 protection = PROT_READ   | PROT_WRITE;
-    I32 flags      = MAP_PRIVATE | MAP_ANON;
-    U8* memory     = (U8*) mmap(NULL, size, protection, flags, -1, 0);
+static U8* os_allocate(Buffer* console, I64 size) {
+    U8* memory = try_os_allocate(size);
     if (memory == MAP_FAILED) {
         print(console, ERROR "Out of memory.\n");
         flush_and_exit(console, EXIT_FAILURE);
     }
-    return (Arena) { console, memory, size };
+    return memory;
+}
+
+static Arena make_arena(Buffer* console, I64 size) {
+    return (Arena) { console, os_allocate(console, size), size };
 }
 
 #define push(arena, type) ((type*) push_bytes((arena), sizeof(type)))
