@@ -27,7 +27,7 @@ static void handle_write_failure(Buffer* console, char* output_path) {
 }
 
 int main(int argc, char** argv) {
-    Buffer console = make_buffer(STDOUT_FILENO, getpagesize());
+    Buffer console = make_console();
 
     print_help(&console, argc, argv, help_message);
 
@@ -54,16 +54,8 @@ int main(int argc, char** argv) {
     char* input_path  = argv[argument_index];
     char* output_path = argv[argument_index + 1];
 
-    Bytes input = read_file(&console, input_path);
-    
-    I32 output_fd = STDOUT_FILENO;
-    if (strcmp(output_path, "-") != 0) {
-        output_fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (output_fd == -1) {
-            print(&console, ERROR "Failed to open \"%s\": %s.\n", make_bytes(output_path), get_error());
-            flush_and_exit(&console, EXIT_FAILURE);
-        }
-    }
+    Bytes  input  = read_file(&console, input_path);
+    Buffer output = open_output(&console, output_path);
 
     Bytes     path      = make_bytes(input_path);
     Assembler assembler = {};
@@ -71,8 +63,6 @@ int main(int argc, char** argv) {
     Lexer* lexer = &assembler.lexer;
     *lexer       = make_lexer(&console, path, input);
     compute_label_offsets(&assembler);
-
-    Buffer output = make_buffer(output_fd, getpagesize());
 
     *lexer       = make_lexer(&console, path, input);
     assembler.pc = 0;

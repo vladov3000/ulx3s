@@ -44,3 +44,15 @@ static void print_help(Buffer* console, int argc, char** argv, const char* help_
         }
     }
 }
+
+static Buffer open_output(Buffer* console, char* output_path) {
+    I32 output_fd = STDOUT_FILENO;
+    if (strcmp(output_path, "-") != 0) {
+        output_fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (output_fd == -1) {
+            print(console, ERROR "Failed to open \"%s\": %s.\n", make_bytes(output_path), get_error());
+            flush_and_exit(console, EXIT_FAILURE);
+        }
+    }
+    return make_buffer(output_fd, getpagesize());
+}

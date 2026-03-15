@@ -11,6 +11,7 @@ def main():
     parser.add_argument("--simulator", action="store_true")
     parser.add_argument("--synthesize", action="store_true")
     parser.add_argument("--program", action="store_true")
+    parser.add_argument("--gamma-table", action="store_true")
 
     arguments = parser.parse_args()
 
@@ -29,7 +30,7 @@ def main():
                 , "-I", "code"
                 , "-o", "output/simulator"
                 , "-g"
-                , "code/simulator/main.cpp"
+                , "code/simulator.cpp"
                 )
             )
         )
@@ -59,6 +60,13 @@ def main():
         )
         if arguments.program:
             commands.append(("fujprog", "output/ulx3s.bit"))
+
+    if arguments.gamma_table:
+        commands.extend(
+            ( ("clang", "-o", "output/make_gamma_table", "code/make_gamma_table.c")
+            , ("output/make_gamma_table", "output/gamma_table.mem")
+            )
+        )
 
     for command in commands:
         print(" ".join(command))

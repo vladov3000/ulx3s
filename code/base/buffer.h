@@ -32,6 +32,10 @@ static Buffer make_buffer(I32 fd, I64 size) {
     return buffer;
 }
 
+static Buffer make_console() {
+    return make_buffer(STDOUT_FILENO, getpagesize());
+}
+
 static bool flush(Buffer* buffer) {
     if (buffer->buffered > 0) {
         ssize_t bytes_written = write(buffer->fd, buffer->memory, buffer->buffered);

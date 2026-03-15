@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -23,6 +24,7 @@ typedef uint8_t  U8;
 typedef uint32_t U32;
 typedef int32_t  I32;
 typedef int64_t  I64;
+typedef double   F64;
 
 typedef struct iovec Iovec;
 

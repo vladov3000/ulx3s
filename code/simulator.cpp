@@ -2,11 +2,11 @@
 #include <cxxrtl/cxxrtl_vcd.h>
 #include <fstream>
 
-#include "../base/prelude.h"
-#include "../base/buffer.h"
-#include "../base/arena.h"
-#include "../base/extra.h"
-#include "../../output/Cpu.hpp"
+#include "base/prelude.h"
+#include "base/buffer.h"
+#include "base/arena.h"
+#include "base/extra.h"
+#include "../output/Cpu.hpp"
 
 using cxxrtl_design::p_Cpu;
 
@@ -19,7 +19,7 @@ static const char* help_message =
     "       --help   Prints this message.\n";
 
 int main(int argc, char** argv) {
-    Buffer console = make_buffer(STDOUT_FILENO, getpagesize());
+    Buffer console = make_console();
 
     print_help(&console, argc, argv, help_message);
 

@@ -111,7 +111,6 @@ module Cpu
 
     logic[31:0] rs2_value;
     assign rs2_value = registers[rs2];
-
     logic[31:0] operand0;
     always_comb
         case (opcode)
